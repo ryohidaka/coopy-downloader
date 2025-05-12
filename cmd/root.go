@@ -24,6 +24,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/ryohidaka/coopy-downloader/internal/browser"
 	"github.com/spf13/cobra"
 )
 
@@ -31,9 +32,21 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "coopy-downloader",
 	Short: "コープこうべの宅配の注文書(CSV)をダウンロードするCLIツール",
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Run:   run,
+}
+
+// CLI 実行時に呼び出されるメイン処理。
+//
+// 引数:
+//   - cmd: 実行された cobra コマンド
+//   - args: コマンドライン引数
+//
+// 返り値:
+//   - なし（エラーが発生した場合は log.Fatal により強制終了）
+func run(cmd *cobra.Command, args []string) {
+	// chromedp用のコンテキストを作成（後でキャンセル関数を呼び出す）
+	ctx, cancel := browser.CreateChromedpContext()
+	defer cancel()
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
