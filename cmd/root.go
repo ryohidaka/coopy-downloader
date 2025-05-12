@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"log"
 	"log/slog"
 	"os"
 
@@ -30,13 +31,17 @@ import (
 )
 
 type Params struct {
-	LoginID  string
-	Password string
+	LoginID   string // ログインID
+	Password  string // パスワード
+	Kikaku    string // 企画回
+	OutputDir string // 出力先ディレクトリ
 }
 
 var (
-	loginId  string
-	password string
+	loginId   string
+	password  string
+	kikaku    string
+	outputDir string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -61,13 +66,20 @@ func run(cmd *cobra.Command, args []string) {
 
 	// フラグからログイン情報を構造体に格納
 	params := Params{
-		LoginID:  loginId,
-		Password: password,
+		LoginID:   loginId,
+		Password:  password,
+		Kikaku:    kikaku,
+		OutputDir: outputDir,
 	}
 
 	// ログイン処理を実行し、失敗した場合はエラーを出力して終了
 	if err := browser.Login(ctx, params.LoginID, params.Password); err != nil {
 		slog.Error("ログイン失敗", "error", err)
+	}
+
+	// 注文ページからダウンロード
+	if err := browser.DownloadOrder(ctx, params.Kikaku, params.OutputDir); err != nil {
+		log.Fatalf("注文書のダウンロード失敗: %v", err)
 	}
 }
 
@@ -86,7 +98,10 @@ func init() {
 	// will be global for your application.
 	rootCmd.Flags().StringVarP(&loginId, "login-id", "i", "", "ログインID（必須）")
 	rootCmd.Flags().StringVarP(&password, "password", "p", "", "パスワード（必須）")
+	rootCmd.Flags().StringVarP(&kikaku, "kikaku", "k", "", "企画回")
+	rootCmd.Flags().StringVarP(&outputDir, "output-dir", "o", ".", "ダウンロード先ディレクトリ")
 
 	rootCmd.MarkFlagRequired("login-id")
 	rootCmd.MarkFlagRequired("password")
+	rootCmd.MarkFlagRequired("kikaku")
 }
