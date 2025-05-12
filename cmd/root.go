@@ -22,10 +22,21 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/ryohidaka/coopy-downloader/internal/browser"
 	"github.com/spf13/cobra"
+)
+
+type Params struct {
+	LoginID  string
+	Password string
+}
+
+var (
+	loginId  string
+	password string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -47,6 +58,17 @@ func run(cmd *cobra.Command, args []string) {
 	// chromedp用のコンテキストを作成（後でキャンセル関数を呼び出す）
 	ctx, cancel := browser.CreateChromedpContext()
 	defer cancel()
+
+	// フラグからログイン情報を構造体に格納
+	params := Params{
+		LoginID:  loginId,
+		Password: password,
+	}
+
+	// ログイン処理を実行し、失敗した場合はエラーを出力して終了
+	if err := browser.Login(ctx, params.LoginID, params.Password); err != nil {
+		slog.Error("ログイン失敗", "error", err)
+	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -62,10 +84,9 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+	rootCmd.Flags().StringVarP(&loginId, "login-id", "i", "", "ログインID（必須）")
+	rootCmd.Flags().StringVarP(&password, "password", "p", "", "パスワード（必須）")
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.coopy-downloader.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.MarkFlagRequired("login-id")
+	rootCmd.MarkFlagRequired("password")
 }
