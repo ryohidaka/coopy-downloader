@@ -42,6 +42,7 @@ var (
 	password  string
 	kikaku    string
 	outputDir string
+	noSandbox bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -60,8 +61,8 @@ var rootCmd = &cobra.Command{
 // 返り値:
 //   - なし（エラーが発生した場合は log.Fatal により強制終了）
 func run(cmd *cobra.Command, args []string) {
-	// chromedp用のコンテキストを作成（後でキャンセル関数を呼び出す）
-	ctx, cancel := browser.CreateChromedpContext()
+	// chromedp用のコンテキストを作成（no-sandboxオプションを指定）
+	ctx, cancel := browser.CreateChromedpContext(noSandbox)
 	defer cancel()
 
 	// フラグからログイン情報を構造体に格納
@@ -100,6 +101,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&password, "password", "p", "", "パスワード（必須）")
 	rootCmd.Flags().StringVarP(&kikaku, "kikaku", "k", "", "企画回")
 	rootCmd.Flags().StringVarP(&outputDir, "output-dir", "o", ".", "ダウンロード先ディレクトリ")
+	rootCmd.Flags().BoolVar(&noSandbox, "no-sandbox", false, "Chromeに --no-sandbox オプションを付けて起動")
 
 	rootCmd.MarkFlagRequired("login-id")
 	rootCmd.MarkFlagRequired("password")

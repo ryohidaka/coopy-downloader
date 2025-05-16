@@ -7,11 +7,21 @@ import (
 )
 
 // Chromedpのコンテキストを生成する
-func CreateChromedpContext() (context.Context, context.CancelFunc) {
-	// create chrome instance
-	ctx, cancel := chromedp.NewContext(
-		context.Background(),
+// noSandbox: true の場合、--no-sandbox を付与
+func CreateChromedpContext(noSandbox bool) (context.Context, context.CancelFunc) {
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
 	)
 
-	return ctx, cancel
+	if noSandbox {
+		opts = append(opts, chromedp.Flag("no-sandbox", true))
+	}
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+
+	return ctx, func() {
+		cancelCtx()
+		cancel()
+	}
 }
