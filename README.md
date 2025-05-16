@@ -5,7 +5,7 @@
 ## インストール
 
 ```bash
-go get github.com/ryohidaka/coopy-downloader
+go install github.com/ryohidaka/coopy-downloader@latest
 ```
 
 ## 使用例
