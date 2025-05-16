@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ryohidaka/coopy-downloader/compare/v0.2.0...v0.3.0) (2025-05-16)
+
+
+### Features
+
+* no-sandbox のオプションを追加 ([ba9f060](https://github.com/ryohidaka/coopy-downloader/commit/ba9f0606aa46ee366e19f4980625cab3d1de97be))
+
 ## [0.2.0](https://github.com/ryohidaka/coopy-downloader/compare/v0.1.0...v0.2.0) (2025-05-16)
 
 
