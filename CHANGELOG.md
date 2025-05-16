@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/ryohidaka/coopy-downloader/compare/v0.1.0...v0.2.0) (2025-05-16)
+
+
+### Features
+
+* 企画回の取得処理を追加 ([5c4ea45](https://github.com/ryohidaka/coopy-downloader/commit/5c4ea455f2e5b88f62402058592842993602677a))
+
 ## 0.1.0 (2025-05-15)
 
 
