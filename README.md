@@ -17,19 +17,22 @@ coopy-downloader --help
 
 Usage:
   coopy-downloader [flags]
+  coopy-downloader [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  kikaku      お届け日から企画回を取得する
 
 Flags:
   -h, --help                help for coopy-downloader
   -k, --kikaku string       企画回
   -i, --login-id string     ログインID（必須）
+      --no-sandbox          Chromeに --no-sandbox オプションを付けて起動
   -o, --output-dir string   ダウンロード先ディレクトリ (default ".")
   -p, --password string     パスワード（必須）
 
-coopy-downloader \
-    --login-id <LOGIN_ID> \
-    --password <PASSWORD> \
-    --kikaku 2025041 \
-    --output-dir .output
+Use "coopy-downloader [command] --help" for more information about a command.
 ```
 
 ## License
