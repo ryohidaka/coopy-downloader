@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"time"
 
 	"github.com/chromedp/chromedp"
 )
@@ -17,11 +18,19 @@ func CreateChromedpContext(noSandbox bool) (context.Context, context.CancelFunc)
 		opts = append(opts, chromedp.Flag("no-sandbox", true))
 	}
 
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	ctx, cancelCtx := chromedp.NewContext(allocCtx)
+	// Create allocator context
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), opts...)
 
+	// Set timeout to 30 seconds
+	timeoutCtx, timeoutCancel := context.WithTimeout(allocCtx, 30*time.Second)
+
+	// Create chromedp context with timeout
+	ctx, cancelCtx := chromedp.NewContext(timeoutCtx)
+
+	// Return composite cancel function
 	return ctx, func() {
 		cancelCtx()
-		cancel()
+		timeoutCancel()
+		allocCancel()
 	}
 }
