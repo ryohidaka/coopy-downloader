@@ -25,6 +25,7 @@ Available Commands:
   kikaku      お届け日から企画回を取得する
 
 Flags:
+      --debug               デバッグログを有効にする
   -h, --help                help for coopy-downloader
   -k, --kikaku string       企画回
   -i, --login-id string     ログインID（必須）

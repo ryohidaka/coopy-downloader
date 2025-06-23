@@ -43,6 +43,7 @@ var (
 	kikaku    string
 	outputDir string
 	noSandbox bool
+	debug     bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -61,6 +62,18 @@ var rootCmd = &cobra.Command{
 // 返り値:
 //   - なし（エラーが発生した場合は log.Fatal により強制終了）
 func run(cmd *cobra.Command, args []string) {
+	// ログレベルを debug に設定（--debug が指定されていれば）
+	level := slog.LevelInfo
+	if debug {
+		level = slog.LevelDebug
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	}))
+	slog.SetDefault(logger)
+
+	slog.Debug("debugログモードを有効化")
+
 	// chromedp用のコンテキストを作成（no-sandboxオプションを指定）
 	ctx, cancel := browser.CreateChromedpContext(noSandbox)
 	defer cancel()
@@ -102,6 +115,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&kikaku, "kikaku", "k", "", "企画回")
 	rootCmd.Flags().StringVarP(&outputDir, "output-dir", "o", ".", "ダウンロード先ディレクトリ")
 	rootCmd.Flags().BoolVar(&noSandbox, "no-sandbox", false, "Chromeに --no-sandbox オプションを付けて起動")
+	rootCmd.Flags().BoolVar(&debug, "debug", false, "デバッグログを有効にする")
 
 	rootCmd.MarkFlagRequired("login-id")
 	rootCmd.MarkFlagRequired("password")

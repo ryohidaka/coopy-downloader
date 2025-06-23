@@ -26,6 +26,7 @@ import (
 //
 //	error: ログインに失敗した場合はエラーを返却する
 func Login(ctx context.Context, loginId, passwd string) error {
+	slog.Debug("ログインページへ遷移開始")
 	err := chromedp.Run(ctx,
 		chromedp.Navigate(constants.LoginURL),
 	)
@@ -33,7 +34,9 @@ func Login(ctx context.Context, loginId, passwd string) error {
 		slog.Error("ログインページへの遷移に失敗", "error", err)
 		return err
 	}
+	slog.Debug("ログインページへ遷移完了")
 
+	slog.Debug("ログインID入力開始")
 	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(constants.InputLoginSelector),
 		chromedp.SendKeys(constants.InputLoginSelector, loginId),
@@ -42,7 +45,9 @@ func Login(ctx context.Context, loginId, passwd string) error {
 		slog.Error("ログインID入力に失敗", "error", err)
 		return err
 	}
+	slog.Debug("ログインID入力完了")
 
+	slog.Debug("パスワード入力開始")
 	err = chromedp.Run(ctx,
 		chromedp.WaitVisible(constants.InputPasswordSelector),
 		chromedp.SendKeys(constants.InputPasswordSelector, passwd),
@@ -51,7 +56,9 @@ func Login(ctx context.Context, loginId, passwd string) error {
 		slog.Error("パスワード入力に失敗", "error", err)
 		return err
 	}
+	slog.Debug("パスワード入力完了")
 
+	slog.Debug("ログインボタンクリック開始")
 	err = chromedp.Run(ctx,
 		chromedp.Click(constants.ButtonLoginSelector),
 		chromedp.Sleep(3*time.Second),
@@ -60,6 +67,7 @@ func Login(ctx context.Context, loginId, passwd string) error {
 		slog.Error("ログインボタンクリックに失敗", "error", err)
 		return err
 	}
+	slog.Debug("ログインボタンクリック完了")
 
 	return nil
 }
@@ -79,11 +87,16 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 	orderURL := constants.OrderBaseURL + kikaku
 
 	// 注文ページへ遷移
+	slog.Debug("注文ページへ遷移開始", slog.String("url", orderURL))
+
 	if err := chromedp.Run(ctx, chromedp.Navigate(orderURL)); err != nil {
+		slog.Error("注文ページの遷移に失敗", "error", err)
 		return fmt.Errorf("注文ページの遷移に失敗: %w", err)
 	}
+	slog.Debug("注文ページへ遷移完了")
 
 	var errorVisible, buttonVisible bool
+	slog.Debug("注文書エラー要素とダウンロードボタンの存在確認")
 
 	// エラー表示とダウンロードボタンの有無を同時に確認
 	err := chromedp.Run(ctx,
@@ -93,19 +106,23 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 		},
 	)
 	if err != nil {
+		slog.Error("要素の検出に失敗", "error", err)
 		return fmt.Errorf("要素の検出に失敗: %w", err)
 	}
 
 	if errorVisible {
+		slog.Warn("注文書が存在しない")
 		return fmt.Errorf("該当の注文書が見つかりません")
 	}
 	if !buttonVisible {
+		slog.Warn("ダウンロードボタンが存在しない")
 		return fmt.Errorf("ダウンロードボタンがありません")
 	}
 
 	// ダウンロードの進捗監視
-	done := make(chan string, 1)
+	slog.Debug("ダウンロード準備開始")
 
+	done := make(chan string, 1)
 	chromedp.ListenTarget(ctx, func(v interface{}) {
 		if ev, ok := v.(*browser.EventDownloadProgress); ok {
 			completed := "(unknown)"
@@ -122,6 +139,7 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 	})
 
 	// ダウンロード動作とボタンクリック
+	slog.Debug("ダウンロードクリック開始")
 	if err := chromedp.Run(ctx,
 		browser.
 			SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
@@ -129,18 +147,22 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 			WithEventsEnabled(true),
 		chromedp.Click(constants.ButtonDownloadSelector, chromedp.ByQuery),
 	); err != nil {
+		slog.Error("ダウンロードクリックに失敗", "error", err)
 		return fmt.Errorf("ダウンロードクリックに失敗: %w", err)
 	}
+	slog.Debug("ダウンロードクリック完了、完了待機中")
 
 	// 完了待ち
 	guid := <-done
-	slog.Info("ダウンロード完了", slog.String("guid", guid), slog.String("path", downloadPath))
+	slog.Debug("ダウンロード完了", slog.String("guid", guid), slog.String("path", downloadPath))
 
 	// ファイルをリネーム
+	slog.Debug("ダウンロードファイルのリネーム処理開始")
 	filename := kikaku + ".csv"
 
 	files, err := os.ReadDir(downloadPath)
 	if err != nil {
+		slog.Error("ダウンロードディレクトリの読み取りに失敗", "error", err)
 		return fmt.Errorf("ダウンロードディレクトリの読み取りに失敗: %w", err)
 	}
 
@@ -149,8 +171,10 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 			oldPath := filepath.Join(downloadPath, f.Name())
 			newPath := filepath.Join(downloadPath, filename)
 			if err := os.Rename(oldPath, newPath); err != nil {
+				slog.Error("ファイルのリネームに失敗", "error", err)
 				return fmt.Errorf("ファイルのリネームに失敗: %w", err)
 			}
+			slog.Debug("ファイルのリネーム完了", slog.String("old", oldPath), slog.String("new", newPath))
 			break
 		}
 	}
