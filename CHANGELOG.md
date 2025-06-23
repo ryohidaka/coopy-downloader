@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/ryohidaka/coopy-downloader/compare/v0.3.0...v0.4.0) (2025-06-23)
+
+
+### Features
+
+* タイムアウト時間を設定 ([273c4f0](https://github.com/ryohidaka/coopy-downloader/commit/273c4f039adf86fc106b4f2fde0e32be139142a7))
+* デバッグログを追加 ([269b604](https://github.com/ryohidaka/coopy-downloader/commit/269b604fce369fdd42851e4b95db016d6d301101))
+
 ## [0.3.0](https://github.com/ryohidaka/coopy-downloader/compare/v0.2.0...v0.3.0) (2025-05-16)
 
 
