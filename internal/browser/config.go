@@ -22,7 +22,7 @@ func CreateChromedpContext(noSandbox bool) (context.Context, context.CancelFunc)
 	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), opts...)
 
 	// Set timeout to 30 seconds
-	timeoutCtx, timeoutCancel := context.WithTimeout(allocCtx, 30*time.Second)
+	timeoutCtx, timeoutCancel := context.WithTimeout(allocCtx, 60*time.Second)
 
 	// Create chromedp context with timeout
 	ctx, cancelCtx := chromedp.NewContext(timeoutCtx)
