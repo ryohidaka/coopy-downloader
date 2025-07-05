@@ -90,17 +90,6 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 
 	orderURL := constants.OrderBaseURL + kikaku
 
-	// ダウンロードの挙動設定を事前に有効化する
-	if err := chromedp.Run(ctx,
-		browser.
-			SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
-			WithDownloadPath(downloadPath).
-			WithEventsEnabled(true),
-	); err != nil {
-		slog.Error("ダウンロード挙動の設定に失敗", "error", err)
-		return fmt.Errorf("ダウンロード設定失敗: %w", err)
-	}
-
 	// 注文ページへ遷移
 	slog.Debug("注文ページへ遷移開始", slog.String("url", orderURL))
 
@@ -134,69 +123,80 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 		return fmt.Errorf("ダウンロードボタンがありません")
 	}
 
-	// ダウンロードイベントを監視
-	var guid string
-	var suggestedFilename string
-	guidChan := make(chan string, 1)
+	// ダウンロードクリックとポーリングによる完了検知
+	slog.Debug("ダウンロード設定とクリック開始")
 
-	chromedp.ListenTarget(ctx, func(ev interface{}) {
-		if e, ok := ev.(*browser.EventDownloadWillBegin); ok {
-			slog.Info("ダウンロード開始検知", slog.String("guid", e.GUID), slog.String("filename", e.SuggestedFilename))
-			guid = e.GUID
-			suggestedFilename = e.SuggestedFilename
-			guidChan <- e.GUID
-			close(guidChan)
-		}
-	})
-
-	// ダウンロードボタンをクリック
-	slog.Debug("ダウンロードクリック開始")
 	if err := chromedp.Run(ctx,
+		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
+			WithDownloadPath(downloadPath).
+			WithEventsEnabled(true),
 		chromedp.Click(constants.ButtonDownloadSelector, chromedp.ByQuery),
 	); err != nil {
 		slog.Error("ダウンロードクリックに失敗", "error", err)
 		return fmt.Errorf("ダウンロードクリックに失敗: %w", err)
 	}
-	slog.Debug("ダウンロードクリック完了、ダウンロード開始待機中")
 
-	// GUID受信を待つ
-	select {
-	case <-guidChan:
-		slog.Debug("GUID受信完了", slog.String("guid", guid), slog.String("suggested", suggestedFilename))
-	case <-ctx.Done():
-		slog.Error("ダウンロード開始イベントを受信できずタイムアウト", "error", ctx.Err())
-		return fmt.Errorf("ダウンロード開始イベントが発生しませんでした: %w", ctx.Err())
+	slog.Debug("ダウンロードクリック完了、完了待機中")
+
+	// ダウンロード完了をファイルポーリングで検知
+	downloadedFile, err := waitForDownloadedFile(downloadPath, 2*time.Minute)
+	if err != nil {
+		slog.Error("ダウンロード検知失敗", "error", err)
+		return err
 	}
+	slog.Debug("ダウンロード完了ファイル検知", slog.String("file", downloadedFile))
 
-	// ダウンロード完了をポーリングで確認（*.crdownloadが消えるまで）
-	slog.Debug("ファイルダウンロード完了待機中")
-	targetPath := filepath.Join(downloadPath, suggestedFilename)
+	// ファイルをリネーム
+	slog.Debug("ダウンロードファイルのリネーム処理開始")
+	newName := kikaku + ".csv"
+	newPath := filepath.Join(downloadPath, newName)
 
-	timeout := time.After(2 * time.Minute)
-	tick := time.Tick(1 * time.Second)
-
-	for {
-		select {
-		case <-timeout:
-			slog.Error("ダウンロードファイルがタイムアウト", slog.String("filename", suggestedFilename))
-			return fmt.Errorf("ダウンロードファイルが見つかりません: %s", suggestedFilename)
-		case <-tick:
-			if _, err := os.Stat(targetPath); err == nil {
-				if !strings.HasSuffix(targetPath, ".crdownload") {
-					goto FOUND
-				}
-			}
-		}
-	}
-
-FOUND:
-	// ファイルをkikaku名にリネーム
-	newPath := filepath.Join(downloadPath, kikaku+".csv")
-	if err := os.Rename(targetPath, newPath); err != nil {
+	if err := os.Rename(downloadedFile, newPath); err != nil {
 		slog.Error("ファイルのリネームに失敗", "error", err)
 		return fmt.Errorf("ファイルのリネームに失敗: %w", err)
 	}
-	slog.Debug("ファイルのリネーム完了", slog.String("old", targetPath), slog.String("new", newPath))
+
+	slog.Debug("ファイルのリネーム完了", slog.String("new", newPath))
 
 	return nil
+}
+
+// 指定されたディレクトリ内の通常ファイルを監視し、ダウンロード完了を検知する
+//
+// 引数:
+//
+//	dir string: 監視対象のディレクトリ
+//	timeout time.Duration: 最大待機時間
+//
+// 戻り値:
+//
+//	string: 完了ファイルのパス
+//	error: タイムアウトまたはエラー発生時に返却する
+func waitForDownloadedFile(dir string, timeout time.Duration) (string, error) {
+	start := time.Now()
+
+	for {
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			return "", fmt.Errorf("ディレクトリの読み取りに失敗: %w", err)
+		}
+
+		for _, f := range files {
+			if f.IsDir() {
+				continue
+			}
+			// .crdownload は未完了ファイル
+			if strings.HasSuffix(f.Name(), ".crdownload") {
+				continue
+			}
+			// 通常ファイルを発見した場合、即返却
+			return filepath.Join(dir, f.Name()), nil
+		}
+
+		if time.Since(start) > timeout {
+			return "", fmt.Errorf("ダウンロード完了ファイルの検出がタイムアウトした")
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
 }
