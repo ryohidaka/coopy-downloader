@@ -84,6 +84,10 @@ func Login(ctx context.Context, loginId, passwd string) error {
 //
 //	error: 処理に失敗した場合はエラーを返却する
 func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) error {
+	// DownloadOrder全体に3分のタイムアウトを適用
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
 	orderURL := constants.OrderBaseURL + kikaku
 
 	// 注文ページへ遷移
@@ -153,8 +157,14 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 	slog.Debug("ダウンロードクリック完了、完了待機中")
 
 	// 完了待ち
-	guid := <-done
-	slog.Debug("ダウンロード完了", slog.String("guid", guid), slog.String("path", downloadPath))
+	var guid string
+	select {
+	case guid = <-done:
+		slog.Debug("ダウンロード完了", slog.String("guid", guid), slog.String("path", downloadPath))
+	case <-ctx.Done():
+		slog.Error("ダウンロードがタイムアウトまたは中断", "error", ctx.Err())
+		return fmt.Errorf("ダウンロードがタイムアウトまたは中断された: %w", ctx.Err())
+	}
 
 	// ファイルをリネーム
 	slog.Debug("ダウンロードファイルのリネーム処理開始")
