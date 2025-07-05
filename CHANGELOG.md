@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/ryohidaka/coopy-downloader/compare/v0.4.4...v0.4.5) (2025-07-05)
+
+
+### Bug Fixes
+
+* CSVファイルのダウンロード完了が検知できない不具合を修正 ([bbc63c5](https://github.com/ryohidaka/coopy-downloader/commit/bbc63c55fccbcf7640344a704a5dbb49a1f0bbaa))
+
 ## [0.4.4](https://github.com/ryohidaka/coopy-downloader/compare/v0.4.3...v0.4.4) (2025-07-05)
 
 
