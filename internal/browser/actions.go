@@ -90,6 +90,17 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 
 	orderURL := constants.OrderBaseURL + kikaku
 
+	// ダウンロードの挙動設定を事前に有効化する
+	if err := chromedp.Run(ctx,
+		browser.
+			SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
+			WithDownloadPath(downloadPath).
+			WithEventsEnabled(true),
+	); err != nil {
+		slog.Error("ダウンロード挙動の設定に失敗", "error", err)
+		return fmt.Errorf("ダウンロード設定失敗: %w", err)
+	}
+
 	// 注文ページへ遷移
 	slog.Debug("注文ページへ遷移開始", slog.String("url", orderURL))
 
@@ -123,71 +134,69 @@ func DownloadOrder(ctx context.Context, kikaku string, downloadPath string) erro
 		return fmt.Errorf("ダウンロードボタンがありません")
 	}
 
-	// ダウンロードの進捗監視
-	slog.Debug("ダウンロード準備開始")
+	// ダウンロードイベントを監視
+	var guid string
+	var suggestedFilename string
+	guidChan := make(chan string, 1)
 
-	done := make(chan string, 1)
-	chromedp.ListenTarget(ctx, func(v interface{}) {
-		if ev, ok := v.(*browser.EventDownloadProgress); ok {
-			completed := "(unknown)"
-			if ev.TotalBytes != 0 {
-				completed = fmt.Sprintf("%0.2f%%", float64(ev.ReceivedBytes)/float64(ev.TotalBytes)*100.0)
-			}
-			slog.Info("ダウンロード進捗", slog.String("state", ev.State.String()), slog.String("completed", completed))
-
-			if ev.State == browser.DownloadProgressStateCompleted {
-				done <- ev.GUID
-				close(done)
-			}
+	chromedp.ListenTarget(ctx, func(ev interface{}) {
+		if e, ok := ev.(*browser.EventDownloadWillBegin); ok {
+			slog.Info("ダウンロード開始検知", slog.String("guid", e.GUID), slog.String("filename", e.SuggestedFilename))
+			guid = e.GUID
+			suggestedFilename = e.SuggestedFilename
+			guidChan <- e.GUID
+			close(guidChan)
 		}
 	})
 
-	// ダウンロード動作とボタンクリック
+	// ダウンロードボタンをクリック
 	slog.Debug("ダウンロードクリック開始")
 	if err := chromedp.Run(ctx,
-		browser.
-			SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
-			WithDownloadPath(downloadPath).
-			WithEventsEnabled(true),
 		chromedp.Click(constants.ButtonDownloadSelector, chromedp.ByQuery),
 	); err != nil {
 		slog.Error("ダウンロードクリックに失敗", "error", err)
 		return fmt.Errorf("ダウンロードクリックに失敗: %w", err)
 	}
-	slog.Debug("ダウンロードクリック完了、完了待機中")
+	slog.Debug("ダウンロードクリック完了、ダウンロード開始待機中")
 
-	// 完了待ち
-	var guid string
+	// GUID受信を待つ
 	select {
-	case guid = <-done:
-		slog.Debug("ダウンロード完了", slog.String("guid", guid), slog.String("path", downloadPath))
+	case <-guidChan:
+		slog.Debug("GUID受信完了", slog.String("guid", guid), slog.String("suggested", suggestedFilename))
 	case <-ctx.Done():
-		slog.Error("ダウンロードがタイムアウトまたは中断", "error", ctx.Err())
-		return fmt.Errorf("ダウンロードがタイムアウトまたは中断された: %w", ctx.Err())
+		slog.Error("ダウンロード開始イベントを受信できずタイムアウト", "error", ctx.Err())
+		return fmt.Errorf("ダウンロード開始イベントが発生しませんでした: %w", ctx.Err())
 	}
 
-	// ファイルをリネーム
-	slog.Debug("ダウンロードファイルのリネーム処理開始")
-	filename := kikaku + ".csv"
+	// ダウンロード完了をポーリングで確認（*.crdownloadが消えるまで）
+	slog.Debug("ファイルダウンロード完了待機中")
+	targetPath := filepath.Join(downloadPath, suggestedFilename)
 
-	files, err := os.ReadDir(downloadPath)
-	if err != nil {
-		slog.Error("ダウンロードディレクトリの読み取りに失敗", "error", err)
-		return fmt.Errorf("ダウンロードディレクトリの読み取りに失敗: %w", err)
-	}
+	timeout := time.After(2 * time.Minute)
+	tick := time.Tick(1 * time.Second)
 
-	for _, f := range files {
-		if !f.IsDir() && strings.HasPrefix(f.Name(), guid) {
-			oldPath := filepath.Join(downloadPath, f.Name())
-			newPath := filepath.Join(downloadPath, filename)
-			if err := os.Rename(oldPath, newPath); err != nil {
-				slog.Error("ファイルのリネームに失敗", "error", err)
-				return fmt.Errorf("ファイルのリネームに失敗: %w", err)
+	for {
+		select {
+		case <-timeout:
+			slog.Error("ダウンロードファイルがタイムアウト", slog.String("filename", suggestedFilename))
+			return fmt.Errorf("ダウンロードファイルが見つかりません: %s", suggestedFilename)
+		case <-tick:
+			if _, err := os.Stat(targetPath); err == nil {
+				if !strings.HasSuffix(targetPath, ".crdownload") {
+					goto FOUND
+				}
 			}
-			slog.Debug("ファイルのリネーム完了", slog.String("old", oldPath), slog.String("new", newPath))
-			break
 		}
 	}
+
+FOUND:
+	// ファイルをkikaku名にリネーム
+	newPath := filepath.Join(downloadPath, kikaku+".csv")
+	if err := os.Rename(targetPath, newPath); err != nil {
+		slog.Error("ファイルのリネームに失敗", "error", err)
+		return fmt.Errorf("ファイルのリネームに失敗: %w", err)
+	}
+	slog.Debug("ファイルのリネーム完了", slog.String("old", targetPath), slog.String("new", newPath))
 
 	return nil
 }
