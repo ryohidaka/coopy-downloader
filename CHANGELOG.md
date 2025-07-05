@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/ryohidaka/coopy-downloader/compare/v0.4.1...v0.4.2) (2025-07-05)
+
+
+### Bug Fixes
+
+* ダウンロード処理にタイムアウト時間を設定 ([5fab960](https://github.com/ryohidaka/coopy-downloader/commit/5fab960991e85540190129c1952cda31c0ab6617))
+
 ## [0.4.1](https://github.com/ryohidaka/coopy-downloader/compare/v0.4.0...v0.4.1) (2025-06-24)
 
 
