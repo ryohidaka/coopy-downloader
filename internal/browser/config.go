@@ -11,7 +11,14 @@ import (
 // noSandbox: true の場合、--no-sandbox を付与
 func CreateChromedpContext(noSandbox bool) (context.Context, context.CancelFunc) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("headless", true),
+		chromedp.Flag("headless", "chrome"),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("disable-dev-shm-usage", true), // /dev/shm の容量不足対策
+		chromedp.Flag("disable-setuid-sandbox", true),
+		chromedp.Flag("no-zygote", true),
+		chromedp.Flag("single-process", true),
+		chromedp.Flag("hide-scrollbars", true),
+		chromedp.Flag("mute-audio", true),
 	)
 
 	if noSandbox {
